@@ -1,0 +1,51 @@
+name: Build Arctic YouTube Downloader
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main, master]
+
+jobs:
+  android:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with: { distribution: temurin, java-version: '17' }
+      - uses: subosito/flutter-action@v2
+        with: { channel: stable }
+      - name: Create platform project
+        run: |
+          flutter create . --platforms=android --project-name arctic_youtube_downloader --org com.arctic
+          flutter pub add youtube_explode_dart path_provider permission_handler ffmpeg_kit_flutter_new
+      - name: Configure Android (name, permissions, minSdk)
+        run: |
+          M=android/app/src/main/AndroidManifest.xml
+          sed -i 's#android:label="[^"]*"#android:label="Arctic YouTube Downloader"#' $M
+          sed -i 's#<application#<uses-permission android:name="android.permission.INTERNET"/><uses-permission android:name="android.permission.MANAGE_EXTERNAL_STORAGE"/><application#' $M
+          for f in android/app/build.gradle.kts android/app/build.gradle; do
+            [ -f "$f" ] && sed -i 's/minSdk = flutter.minSdkVersion/minSdk = 24/; s/minSdkVersion flutter.minSdkVersion/minSdkVersion 24/' "$f" || true
+          done
+      - run: flutter build apk --release
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Arctic-YouTube-Downloader-Android-APK
+          path: build/app/outputs/flutter-apk/app-release.apk
+
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with: { channel: stable }
+      - name: Create platform project
+        shell: bash
+        run: |
+          flutter create . --platforms=windows --project-name arctic_youtube_downloader --org com.arctic
+          flutter pub add youtube_explode_dart path_provider permission_handler ffmpeg_kit_flutter_new
+          sed -i 's/L"arctic_youtube_downloader"/L"Arctic YouTube Downloader"/' windows/runner/main.cpp
+      - run: flutter build windows --release
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Arctic-YouTube-Downloader-Windows
+          path: build/windows/x64/runner/Release/
